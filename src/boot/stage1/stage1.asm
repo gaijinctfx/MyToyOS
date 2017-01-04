@@ -15,8 +15,12 @@ _start:
 
   ; OBS: At this point SS still points to 0x9000!
 
+  ; TODO...
   hlt
 
+;===============================================
+; Gate A20 routines
+;===============================================
 ;-------------------
 ; Enable Gate A20 (Fast Gate A20 method)
 ;-------------------
@@ -133,4 +137,56 @@ check_enabled_a20:
   pop   ds
   ret
 
+;===============================================
+; All 32 bits protected mode routines goes below!
+;===============================================
+
+bits 32
+align 4
+
+; FIXME: Maybe is sufficient that the Stack is at the end
+;        of usable lower RAM at this point...
+STKTOP equ  0x9fffc
+
+;===============================================
+; Protected mode starts here.
+;===============================================
+go32:
+  ; We must jump here with IF disabled!!!
+  ; Probably with NMI and all IRQ masked as well...
+  mov   ax,0x10   ; Data selector
+  mov   ds,ax
+  mov   es,ax
+
+  ; FIXME: Must choose an appropriate stack region!
+  mov   ss,ax
+  mov   esp,STKTOP
+
+
+  ;TODO...
+  ;...
+
+  ; if everything is ok until now...
+  jmp   8:0x100000    ; ...Jumps to kernel!
+
+;===============================================
+; Screen routines.
+;===============================================
+;-------
+; Simple clear_screen
+; Destroys: EDI, ECX and EAX.
+;-------
+clear_screen:
+  ; DF is always zero?!
+  mov   edi,0xb8000
+  mov   ecx,4000
+  mov   ax,0x0720
+  rep   stosw
+  ret
+
+;===============================================
+; Disk I/O routines.
+;===============================================
+; ... TODO ...
+; The routines below will be called by 32 bits protected mode code.
 
