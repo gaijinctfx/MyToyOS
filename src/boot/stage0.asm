@@ -16,7 +16,7 @@ org 0
 drivenum:       db  0
 cylinder:       dw  0
 head:           db  0
-sector:         db  1
+sector:         db  1 ; THIS sector.
 stage1_sectors: db  8 ; arbitrary value!
                       ; 8 sectors will give us 4 KiB.
                       ; 360 KiB floppy disks have 9 sectors/cylinder!
@@ -42,6 +42,31 @@ _start:
   ; Read the stage1 and jump to it, unless we got an
   ; error, in this caso, show "System halted" and halts!
   ;...
+  mov   ax,0x0060   ; Read 4 KiB to 0x0060:0000.
+  mov   es,ax
+  xor   bx,bx
+
+  ; we'll read 4 KiB starting next sector.
+  mov   cx,[cylinder] ; Cylinder and sector special BIOS
+  xchg  ch,cl         ; encoding: CH = cyls lsb
+  shr   cl,6          ;           CL = cc_ssssss
+  mov   al,[sector]   ; where:
+  inc   al            ;           cc = cyls 2 msb
+  and   al,0x3f       ;           ssssss = sector.
+  or    cl,al
+
+  mov   al,[stage1_sectors]
+  mov   dh,[head]
+  mov   dl,[drivenum]
+
+  mov   ah,2
+  int   0x13        ; Read the sectors.
+  jc    .read_error
+  jmp   0x0060:0    ; Jump to stage1.
+
+.read_error:
+  mov   si,stage1_read_error
+  call  putstr
 
 sys_halt:
   mov   si,sys_halted_error
@@ -77,11 +102,11 @@ chs_read_sectors:
 
 boot_string:
   db    "Stage0: Loading Stage1...",13,10,0
+stage1_read_error:
+  db    "Error trying to read stage 1 sectors!",13,10,0
 sys_halted_error:
   db    "System Halted!",13,10,0
 
 times 510-($-$$) db 0
 boot_signature:
   db  0x55,0xaa
-stage1_jmp:
-  ; will jump here after read all remaining 8 sectors.
