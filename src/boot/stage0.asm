@@ -8,7 +8,7 @@ bits 16
 org 0
 
   ; Makes sure we're in the correct segment.
-  jmp 0x7c00:_start
+  jmp 0x07c0:_start
 
 ;--------
 ; Drive geometry descriptor
@@ -34,7 +34,7 @@ _start:
   mov   sp,ax
   sti
 
-  mov   di,boot_string
+  mov   si,boot_string
   call  putstr
 
   ;...
@@ -44,7 +44,7 @@ _start:
   ;...
 
 sys_halt:
-  mov   di,sys_halted_error
+  mov   si,sys_halted_error
   call  putstr
 .hlt_loop:
   hlt
