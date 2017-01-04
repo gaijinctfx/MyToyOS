@@ -38,18 +38,17 @@ _start:
   call  putstr
 
   ;...
-  ; TODO:
   ; Read the stage1 and jump to it, unless we got an
   ; error, in this caso, show "System halted" and halts!
   ;...
-  mov   ax,0x0060   ; Read 4 KiB to 0x0060:0000.
+  mov   ax,0x0060   ; Read stage1 to 0x0060:0000.
   mov   es,ax
   xor   bx,bx
 
   ; we'll read 4 KiB starting next sector.
   mov   cx,[cylinder] ; Cylinder and sector special BIOS
   xchg  ch,cl         ; encoding: CH = cyls lsb
-  shr   cl,6          ;           CL = cc_ssssss
+  shl   cl,6          ;           CL = cc_ssssss
   mov   al,[sector]   ; where:
   inc   al            ;           cc = cyls 2 msb
   and   al,0x3f       ;           ssssss = sector.
@@ -92,14 +91,9 @@ putstr:
 .putstr_end:
   ret
 
-;------------
-; void chs_read_sectors(int c, char h, char s, char count);
-;
-; Entry:
-;------------
-chs_read_sectors:
-  ret
-
+;-----------
+; Strings
+;-----------
 boot_string:
   db    "Stage0: Loading Stage1...",13,10,0
 stage1_read_error:
@@ -107,6 +101,9 @@ stage1_read_error:
 sys_halted_error:
   db    "System Halted!",13,10,0
 
+;-----------
+; BIOS requires this signature.
+;-----------
 times 510-($-$$) db 0
 boot_signature:
   db  0x55,0xaa
