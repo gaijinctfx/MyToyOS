@@ -5,6 +5,11 @@
 ; This stage will switch to protected mode.
 ;=======================================
 
+; This is required since the GDT will map ALL memory from
+; physical address 0 to 4 GiB - 1.
+S1_OFFSET equ 0x600
+%define S1_ADDR(x) ((x)+S1_OFFSET)
+
 bits 16
 
 org 0
@@ -16,7 +21,49 @@ _start:
   ; OBS: At this point SS still points to 0x9000!
 
   ; TODO...
+
+  cli
+
+  ; Try to enable Gate A20.
+  call  enable_gate_a20_int15h
+  jnc   .gate_a20_enabled
+  call  enable_gate_a20_kbdc
+  jnc   .gate_a20_enabled
+  call  enable_gate_a20_fast
+.gate_a20_enabled:
+  call  check_enabled_a20
+  jc    error_enabling_gate_a20
+
+  lgdt  [global_descriptors_table_struct]
+  mov   eax,cr0
+  or    ax,1                  ; Set PE bit.
+  mov   cr0,eax
+  jmp   8:S1_ADDR(go32)       ; Is this correct?!
+
+error_enabling_gate_a20:
+  mov   si,error_enabling_gate_a20_msg
+  call  puts
+
+sys_halt:
   hlt
+  jmp   sys_halt
+
+error_enabling_gate_a20_msg:
+  db    "error enable Gate A20.",13,10,0
+
+;------------------
+; puts(char *s)
+; Entry: SI=s
+;------------------
+puts:
+  lodsb
+  test  al,al
+  jz    .puts_exit
+  mov   ah,0x0e
+  int   0x10
+  jmp   puts
+.puts_exit:
+  ret
 
 ;===============================================
 ; Gate A20 routines
@@ -137,17 +184,51 @@ check_enabled_a20:
   pop   ds
   ret
 
+;-------
+; Global Descriptors Table
+;
+;     3                   2                   1  
+;   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+;  +---------------+-+-+-+-+-------+-+---+-+-------+---------------+
+;  |               | |D| |A|  Seg  | | D | |       |               |
+;  |  Base 31:24   |G|\|L|V| Limit |P| P |S|  Type |   Base 23:16  | +4
+;  |               | |B| |L| 19:16 | | L | |       |               |
+;  +---------------+-+-+-+-+-------+-+---+-+-------+---------------+
+;  +-------------------------------+-------------------------------+
+;  |                               |                               |
+;  |         Base 15:0             |    Segment Limit 15:0         | +0
+;  |                               |                               |
+;  +-------------------------------+-------------------------------+
+;-------
+global_descriptors_table_struct:
+  dw  global_descritors_table_end - global_descriptors_table - 1  ; Limit
+  dd  S1_ADDR(global_descriptors_table)                           ; Address.
+
+  align 8
+global_descriptors_table:
+  ; NULL descriptor
+  dd  0,0
+
+  ; Selector 0x08: CS DPL=0,32b,4 GiB Limit,Base=0
+  dw  0xffff, 0
+  db  0
+  db  0x9a        ; Codeseg, execute/read, DPL=0
+  db  0xcf        ; 4 GiB, 32 bits
+  db  0
+
+  ; Selector 0x10: DS DPL=0,32b,4 GiB limit,Base=0
+  dw  0xffff, 0
+  db  0
+  db  0x92        ; Dataseg, read/write, DPL=0
+  db  0xcf        ; 4 GiB, 32 bits
+  db  0
+global_descritors_table_end:
+
 ;===============================================
 ; All 32 bits protected mode routines goes below!
 ;===============================================
 
-; This is required since the GDT will map ALL memory from
-; physical address 0 to 4 GiB - 1.
-S1_OFFSET equ 0x600
-%define S1_ADDR(x) ((x)+S1_OFFSET)
-
 bits 32
-align 4
 
 ; FIXME: Maybe is sufficient that the Stack is at the end
 ;        of usable lower RAM at this point...
@@ -156,17 +237,19 @@ STKTOP equ  0x9fffc
 ;===============================================
 ; Protected mode starts here.
 ;===============================================
+  align 4
 go32:
   ; We must jump here with IF disabled!!!
   ; Probably with NMI and all IRQ masked as well...
   mov   ax,0x10   ; Data selector
   mov   ds,ax
   mov   es,ax
+  ;mov   fs,ax
+  ;mov   gs,ax
 
   ; FIXME: Must choose an appropriate stack region!
   mov   ss,ax
   mov   esp,STKTOP
-
 
   ;TODO...
   ;...
@@ -296,4 +379,8 @@ putchar:
 ;===============================================
 ; ... TODO ...
 ; The routines below will be called by 32 bits protected mode code.
+
+;===============================================
+; FileSystem Routines.
+;===============================================
 
