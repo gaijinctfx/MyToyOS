@@ -72,22 +72,18 @@ puts:
 ; Enable Gate A20 (Fast Gate A20 method)
 ;-------------------
 enable_gate_a20_fast:
-  cli
   in    al,0x92
   bts   ax,1
   jc    .enable_gate_a20_fast_exit
   and   al,0xfe
   out   0x92,al
 .enable_gate_a20_fast_exit:
-  sti
   ret
 
 ;--------------------
 ; Enable GateA20 (KBDC method)
 ;--------------------
 enable_gate_a20_kbdc:
-  cli
-  
   call  .kbdc_wait1
   mov   al,0xad       ; Disable Keyboard.
   out   0x64,al
@@ -108,8 +104,6 @@ enable_gate_a20_kbdc:
   mov   al,0xae       ; Re-enable keyboard.
   out   0x64,al
   call  .kbdc_wait1
-
-  sti
   ret
 
 .kbdc_wait1:
