@@ -141,6 +141,11 @@ check_enabled_a20:
 ; All 32 bits protected mode routines goes below!
 ;===============================================
 
+; This is required since the GDT will map ALL memory from
+; physical address 0 to 4 GiB - 1.
+S1_OFFSET equ 0x600
+%define S1_ADDR(x) ((x)+S1_OFFSET)
+
 bits 32
 align 4
 
@@ -172,16 +177,118 @@ go32:
 ;===============================================
 ; Screen routines.
 ;===============================================
+
+;-------
+; Screen vars
+;-------
+current_x:  db  0
+current_y:  db  0
+
+;------
+; Get current page address
+; Returns EDI with base address.
+; Destroys EAX and EDX.
+;------
+get_screen_page_base_addr:
+  movzx edi,byte [0x462]    ; Current Video Page.
+  mov   eax,4096
+  inc   edi
+  mul   edi
+  add   eax,0xb8000
+  mov   edi,eax
+  ret
+
+;-------
+; Get current cursor position address.
+; Destroys EAX, EDX, ESI, EDI and EBX.
+;-------
+get_current_cursor_position_addr:
+  call  S1_ADDR(get_screen_page_base_addr)
+  mov   esi,edi
+  movzx ebx,byte [S1_ADDR(current_x)]
+  movzx ecx,byte [S1_ADDR(current_y)]
+  mov   eax,160
+  mul   ecx
+  mov   edi,eax
+  shl   ebx,1
+  add   edi,esi
+  add   edi,ebx
+  ret
+  
+;-------
+; Advance cursor 1 char
+;-------
+advance_cursor:
+  mov   ah,[S1_ADDR(current_x)]
+  inc   ah
+  cmp   ah,80
+  jae   .next_line
+.advance_cursor_exit:
+  mov   [S1_ADDR(current_x)],ah
+  ret
+.next_line:
+  xor   ah,ah
+  mov   al,[S1_ADDR(current_y)]
+  cmp   al,25
+  jae   .scroll_up
+  inc   al
+  mov   [S1_ADDR(current_y)],al
+  jmp   .advance_cursor_exit
+.scroll_up:
+  mov   [S1_ADDR(current_x)],ah
+  call S1_ADDR(scroll_up)
+  ret
+
+;-------
+; Scrolls page 1 line up:
+;-------
+scroll_up:
+  call  S1_ADDR(get_screen_page_base_addr)
+  mov   esi,edi
+  add   esi,160
+  mov   ecx,160*24
+  rep   movsb
+  mov   ax,0x0720
+  mov   edi,esi
+  mov   ecx,160
+  rep   stosw
+  ret
+
 ;-------
 ; Simple clear_screen
-; Destroys: EDI, ECX and EAX.
+; Destroys: EDI, EDX, ECX and EAX.
 ;-------
 clear_screen:
   ; DF is always zero?!
-  mov   edi,0xb8000
+  call  S1_ADDR(get_screen_page_base_addr)
   mov   ecx,4000
   mov   ax,0x0720
   rep   stosw
+  ret
+
+;-------
+; setup_current_pos (Gets the cursor current position from BIOS).
+; Destroys EAX and EBX.
+; Called only once!
+;-------
+_setup_current_pos:
+  movzx ebx,byte [0x462]  ; Current Video Page.
+  mov   ax,[0x450+ebx]    ; Current Page cursor position.
+  mov   [S1_ADDR(current_x)],ah
+  mov   [S1_ADDR(current_y)],al
+  ret
+
+;-------
+; putchar
+; Entry: AL = char.
+;-------
+putchar:
+  mov   ecx,eax
+  call  S1_ADDR(get_current_cursor_position_addr)
+  mov   eax,ecx
+  mov   ah,0x07
+  stosw
+  call  S1_ADDR(advance_cursor)
   ret
 
 ;===============================================
