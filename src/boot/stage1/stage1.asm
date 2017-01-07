@@ -371,8 +371,114 @@ putchar:
 ;===============================================
 ; Disk I/O routines.
 ;===============================================
-; ... TODO ...
-; The routines below will be called by 32 bits protected mode code.
+hdd_io_ports:
+  dw  0x1f0, 0x1f0, 0x170, 0x170
+
+; Entry (C calling convention):
+;
+struc read_sectors_stk
+.oldbp:     resd  1
+.drive:     resd  1
+.lba:       resq  1
+.sectors:   resd  1
+.bufferptr: resd  1
+endstruc
+;
+; Exit: CF=1 (error), CF=0 (ok)
+;
+read_sectors:
+  push  ebp
+
+  mov   ebp,[esp+read_sectors_stk.drive]  
+  mov   eax,[esp+read_sectors_stk.lba+4]  
+  mov   edi,[esp+read_sectors_stk.lba]
+  mov   ecx,[esp+read_sectors_stk.sectors]
+  mov   esi,[esp+read_sectors_stk.bufferptr]  
+
+  ; Check LBA
+  test  eax,eax           ; TODO: LBA48 not yet implemented
+  jnz   .error
+
+  cmp   edi,0x0fffffff    ; Checks if can use LBA28...
+  jbe   .read_lba28
+
+.error:
+  pop   ebp
+  stc
+  ret
+  
+.read_lba28:
+  ; Get I/O port based on drive.
+  mov   eax,ebp
+  and   eax,3
+  movzx ebx,word [S1_ADDR(hdd_io_ports)+eax*2]
+  lea   edx,[ebx+2]
+
+  ; Write Sectors Reg.
+  mov   eax,ecx
+  out   dx,al
+
+  ; Write LBA Lo, Med & Hi Regs.
+  inc   edx
+  mov   eax,edi
+  out   dx,al
+  mov   eax,edi
+  inc   edx
+  shr   eax,8
+  out   dx,al
+  mov   eax,edi
+  inc   edx
+  shr   eax,16
+  out   dx,al
+
+  inc   edx
+  mov   eax,ebp     ; Separate device bit.
+  and   eax,1
+  sal   eax,5
+  shr   edi,24      ; Separate LBA[27:24]
+  and   edi,0x0f
+  or    eax,edi     ; Write them.
+  out   dx,al
+
+  ; Write Command READ_MULTIPLE.
+  inc   edx
+  mov   al,0xc4
+  out   dx,al
+  
+  ; Waits 400ns and waits for (!BSY | RDY)
+  in    al,dx
+  in    al,dx
+  in    al,dx
+  in    al,dx
+.wait_until_notbusy:
+  in    al,dx
+  mov   ch,al
+  and   al,0xc0
+  cmp   al,0x40
+  jne   .wait_until_notbusy
+
+  ; Checks for errors.
+  test  ch,1
+  jnz   .error
+
+  ; Read the sectors.
+  movzx edi,cl
+  xor   ecx,ecx
+  sal   edi,8
+  test  edi,edi
+  je    .read_lba_exit
+  lea   edx,[ebx]         ; Points to data port.
+.read_loop:
+  in    ax,dx
+  mov   [esi+ecx*2],ax
+  inc   ecx
+  cmp   ecx,edi
+  jne   .read_loop  
+
+.read_lba_exit:
+  pop   ebp
+  clc
+  ret
 
 ;===============================================
 ; FileSystem Routines.
