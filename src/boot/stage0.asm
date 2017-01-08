@@ -14,12 +14,9 @@ org 0
 ; Drive geometry descriptor
 ;--------
 drivenum:       db  0
-cylinder:       dw  0
-head:           db  0
-sector:         db  1 ; THIS sector.
-stage1_sectors: db  8 ; arbitrary value!
-                      ; 8 sectors will give us 4 KiB.
-                      ; 360 KiB floppy disks have 9 sectors/cylinder!
+start_lba:      dd  1   ; FIXME: Setup when disk is formated.
+                        ;        Or, later, I can get it from
+                        ;        the partition table.
 
 _start:
   cld
@@ -41,24 +38,12 @@ _start:
   ; Read the stage1 and jump to it, unless we got an
   ; error, in this caso, show "System halted" and halts!
   ;...
-  mov   ax,0x0060   ; Read stage1 to 0x0060:0000.
-  mov   es,ax
-  xor   bx,bx
-
-  ; we'll read 4 KiB starting next sector.
-  mov   cx,[cylinder] ; Cylinder and sector special BIOS
-  xchg  ch,cl         ; encoding: CH = cyls lsb
-  shl   cl,6          ;           CL = cc_ssssss
-  mov   al,[sector]   ; where:
-  inc   al            ;           cc = cyls 2 msb
-  and   al,0x3f       ;           ssssss = sector.
-  or    cl,al
-
-  mov   al,[stage1_sectors]
-  mov   dh,[head]
+  mov   eax,[start_lba]
+  mov   [dap_start],eax
+  lea   si,[dap]
   mov   dl,[drivenum]
 
-  mov   ah,2
+  mov   ah,0x42
   int   0x13        ; Read the sectors.
   jc    .read_error
   jmp   0x0060:0    ; Jump to stage1.
@@ -101,9 +86,19 @@ stage1_read_error:
 sys_halted_error:
   db    "System Halted!",13,10,0
 
+dap:
+dap_size:     dw  dap_length-dap
+dap_sectors:  dw  8
+dap_buffer:   dd  0x600
+dap_start:    dq  0
+dap_length:
+
 ;-----------
 ; BIOS requires this signature.
 ;-----------
 times 510-($-$$) db 0
 boot_signature:
   db  0x55,0xaa
+
+; Data area, if needed.
+heap:
