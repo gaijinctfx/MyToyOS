@@ -391,6 +391,7 @@ get_hdd_info:
   mov     bx,[S1_ADDR(hdd_io_ports)+ebx*2]
   and     al,1
   shl     al,4
+  or      al,0x40       ; LBA bit set.
   lea     edx,[ebx+6]
   out     dx,al
   inc     edx
