@@ -375,6 +375,10 @@ hdd_io_ports:
   dw  0x1f0, 0x1f0, 0x170, 0x170
 
 ; Entry (C calling convention):
+;   int read_sectors(uint8_t drive,
+;                    uint64_t lba,
+;                    uint16_t sectors,
+;                    void *bufferptr);
 ;
 struc read_sectors_stk
 .oldbp:     resd  1
@@ -386,20 +390,26 @@ endstruc
 ;
 ; Exit: CF=1 (error), CF=0 (ok)
 ;
+; Destroys ALL GPRs
+;
+; Note: Don't deal with specific errors here.
+;
 read_sectors:
   push  ebp
 
   mov   ebp,[esp+read_sectors_stk.drive]  
   mov   eax,[esp+read_sectors_stk.lba+4]  
-  mov   edi,[esp+read_sectors_stk.lba]
+  mov   esi,[esp+read_sectors_stk.lba]
   mov   ecx,[esp+read_sectors_stk.sectors]
-  mov   esi,[esp+read_sectors_stk.bufferptr]  
+  mov   edi,[esp+read_sectors_stk.bufferptr]  
+
+  ; TODO: To check the maximum sectors transfer count!
 
   ; Check LBA
   test  eax,eax           ; TODO: LBA48 not yet implemented
   jnz   .error
 
-  cmp   edi,0x0fffffff    ; Checks if can use LBA28...
+  cmp   esi,0x0fffffff    ; Checks if can use LBA28...
   jbe   .read_lba28
 
 .error:
@@ -420,24 +430,24 @@ read_sectors:
 
   ; Write LBA Lo, Med & Hi Regs.
   inc   edx
-  mov   eax,edi
+  mov   eax,esi
   out   dx,al
-  mov   eax,edi
+  mov   eax,esi
   inc   edx
   shr   eax,8
   out   dx,al
-  mov   eax,edi
+  mov   eax,esi
   inc   edx
   shr   eax,16
   out   dx,al
 
   inc   edx
+  shr   esi,24      ; Separate LBA[27:24]
+  and   esi,0x0f
   mov   eax,ebp     ; Separate device bit.
   and   eax,1
-  sal   eax,5
-  shr   edi,24      ; Separate LBA[27:24]
-  and   edi,0x0f
-  or    eax,edi     ; Write them.
+  sal   eax,4       
+  or    eax,esi     ; Write them.
   out   dx,al
 
   ; Write Command READ_MULTIPLE.
@@ -462,18 +472,11 @@ read_sectors:
   jnz   .error
 
   ; Read the sectors.
-  movzx edi,cl
-  xor   ecx,ecx
-  sal   edi,8
-  test  edi,edi
-  je    .read_lba_exit
+  movzx ecx,cl
+  shl   ecx,8             ; Each sector has 256 words.
   lea   edx,[ebx]         ; Points to data port.
-.read_loop:
-  in    ax,dx
-  mov   [esi+ecx*2],ax
-  inc   ecx
-  cmp   ecx,edi
-  jne   .read_loop  
+  cld                     ; Make sure transfers are forward.
+  rep   insw
 
 .read_lba_exit:
   pop   ebp
@@ -483,4 +486,4 @@ read_sectors:
 ;===============================================
 ; FileSystem Routines.
 ;===============================================
-
+; TODO: ...
