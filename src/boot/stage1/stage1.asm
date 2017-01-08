@@ -368,6 +368,23 @@ putchar:
   call  S1_ADDR(advance_cursor)
   ret
 
+; Entry: ESI = buffer ptr
+;        ECX = buffer size
+; Exit:  AX = 16 bit checksum
+calc_chksum16:
+  cld
+  xor   ebx,ebx
+.loop:
+  lodsb
+  xor   edx,edx
+  mov   dx,ax
+  add   bx,dx
+  adc   bx,0
+  dec   ecx
+  jnz   .loop
+  mov   ax,bx
+  ret
+
 ;===============================================
 ; Disk I/O routines.
 ;===============================================
@@ -386,8 +403,6 @@ hdd_io_ports:
 ;   Destroys: EAX, EBX, ECX, EDX, ESI
 ;
 get_hdd_info:
-  sub     esp,8         ; Local var (sectors_count).
-
   movzx   ebx,al
   mov     bx,[S1_ADDR(hdd_io_ports)+ebx*2]
   and     al,1
@@ -410,62 +425,46 @@ get_hdd_info:
   test  ch,1
   jnz   .error
   
-  ; Is ATA device?
-  lea   edx,[ebx]
-  in    ax,dx
-  test  ax,0x8000
+  ; Read 1 sector to the heap.
+  mov   edi,S1_ADDR(heap)
+  push  edi
+  push  edi
+  mov   ecx,256
+  cld
+  rep   insw
+  pop   esi
+
+  ; Calculates checksum and compare it...
+  mov   ecx,255*2
+  call  calc_chksum16
+  pop   edi
+  cmp   word [edi+254],ax
   jnz   .error
 
-  ; TODO: ... get maximum sectors per read here later!
+  ; Is ATA device?
+  test  byte [edi+2],0x80
+  jnz   .error
 
-  ; Gets maximum LBA28 sectors count.
-  xor   esi,esi
-  mov   cl,59          ; Discards the next 59 registers.
-.loop1:
-  in    ax,dx
-  dec   cl
-  jnz   .loop1
-  in    eax,dx
-  mov   [esp],eax       ; Save LBA28 sectors count on local var.
-  mov   dword [esp+4],0
-  
   ; Supports LBA48?
-  mov   cl,21          ; Discards the next 21 registers.
-.loop2:
-  in    ax,dx
-  dec   cl
-  jnz   .loop2
-  in    ax,dx           ; Gets register 83.
-  test  ax,1
+  test  byte [edi+167],0x04   ; Supports LBA48? ZF=1 is NO.
   jz    .only_lba28
-  inc   esi             ; ESI=0 (lba28), ESI != 0 (lba48). 
-.only_lba28:  
 
-  ; if LBA48 is supported, read
-  or    esi,esi
-  jz    .exit
-  mov   cl,16          ; Discards the next 16 registers.
-.loop3:
-  in    ax,dx
-  dec   cl
-  jnz   .loop3
-  in    eax,dx           ; Gets register 100.
-  mov   [esp],eax        ; Saves LBA48 sectors count on local var.
-  in    eax,dx
-  mov   [esp+4],eax
+  mov   eax,[edi+200]
+  mov   edx,[edi+202]
+  jmp   .exit
+
+.only_lba28:  
+  ; if LBA28 supported, get maximum count
+  movzx eax,word [edi+120]    ; sectors count.
+  xor   edx,edx
 
 .exit:
-  mov   cl,128           ; FIXME: 128 sectors per read.
-                         ;        Will get, later, from IDENTIFY.
-  mov   eax,[esp]
-  mov   edx,[esp+4]
-  add   esp,8
-  or    esi,esi
+  mov   cl,[edi+94]     ; maximum sectors count per transaction.
+
   clc
   ret
 
 .error:
-  add   esp,8
   stc
   ret
 
@@ -579,3 +578,9 @@ read_sectors:
 ; FileSystem Routines.
 ;===============================================
 ; TODO: ...
+
+;===============================================
+; HEAP space
+;===============================================
+  align 4
+heap:
