@@ -34,7 +34,7 @@ int main(void)
     return 1;
   }
 
-  p = (struct geom_s *)(((char *)buffer)+0x17e);
+  p = (struct geom_s *)(((char *)buffer)+0x1be);
 
   // Show partition table entry.
   printf("LBA: %lu, sectors: %lu\n", p->lba, p->sectors);
