@@ -374,6 +374,95 @@ putchar:
 hdd_io_ports:
   dw  0x1f0, 0x1f0, 0x170, 0x170
 
+; Gets controller info.
+;   Entry:
+;           AL = drive
+;   Exit:
+;           EDX:EAX = sectors count.
+;           CF=0, ok; CF=1, error
+;           ZF=0, support LBA48; ZF=1, only LBA28
+;
+;   Destroys: EAX, EBX, ECX, EDX, ESI
+;
+get_hdd_info:
+  sub     esp,8         ; Local var (sectors_count).
+
+  movzx   ebx,al
+  mov     bx,[S1_ADDR(hdd_io_ports)+ebx*2]
+  and     al,1
+  shl     al,4
+  lea     edx,[ebx+6]
+  out     dx,al
+  inc     edx
+  mov     al,0xec       ; IDENTIFY_DEVICE command.
+  out     dx,al
+
+  ; Waits 400ns and waits for (!BSY | RDY)
+  times 4 in al,dx
+.wait_until_notbusy:
+  in    al,dx
+  mov   ch,al
+  and   al,0xc0
+  cmp   al,0x40
+  jne   .wait_until_notbusy
+  test  ch,1
+  jnz   .error
+  
+  ; Is ATA device?
+  lea   edx,[ebx]
+  in    ax,dx
+  test  ax,0x8000
+  jnz   .error
+
+  ; Gets maximum LBA28 sectors count.
+  xor   esi,esi
+  mov   cl,59          ; Discards the next 59 registers.
+.loop1:
+  in    ax,dx
+  dec   cl
+  jnz   .loop1
+  in    eax,dx
+  mov   [esp],eax       ; Save LBA28 sectors count on local var.
+  mov   dword [esp+4],0
+  
+  ; Supports LBA48?
+  mov   cl,21          ; Discards the next 21 registers.
+.loop2:
+  in    ax,dx
+  dec   cl
+  jnz   .loop2
+  in    ax,dx           ; Gets register 83.
+  test  ax,1
+  jz    .only_lba28
+  inc   esi             ; ESI=0 (lba28), ESI != 0 (lba48). 
+.only_lba28:  
+
+  ; if LBA48 is supported, read
+  or    esi,esi
+  jz    .exit
+  mov   cl,16          ; Discards the next 16 registers.
+.loop3:
+  in    ax,dx
+  dec   cl
+  jnz   .loop3
+  in    eax,dx           ; Gets register 100.
+  mov   [esp],eax        ; Saves LBA48 sectors count on local var.
+  in    eax,dx
+  mov   [esp+4],eax
+
+.exit:
+  mov   eax,[esp]
+  mov   edx,[esp+4]
+  add   esp,8
+  or    esi,esi
+  clc
+  ret
+
+.error:
+  add   esp,8
+  stc
+  ret
+
 ; Entry (C calling convention):
 ;   int read_sectors(uint8_t drive,
 ;                    uint64_t lba,
@@ -456,10 +545,7 @@ read_sectors:
   out   dx,al
   
   ; Waits 400ns and waits for (!BSY | RDY)
-  in    al,dx
-  in    al,dx
-  in    al,dx
-  in    al,dx
+  times 4 in al,dx
 .wait_until_notbusy:
   in    al,dx
   mov   ch,al
