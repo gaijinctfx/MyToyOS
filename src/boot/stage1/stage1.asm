@@ -348,7 +348,7 @@ clear_screen:
 ; Destroys EAX and EBX.
 ; Called only once!
 ;-------
-_setup_current_pos:
+get_bios_current_screen_pos:
   movzx ebx,byte [0x462]  ; Current Video Page.
   mov   ax,[0x450+ebx]    ; Current Page cursor position.
   mov   [S1_ADDR(current_x)],ah
@@ -445,6 +445,10 @@ get_hdd_info:
   test  byte [edi+2],0x80
   jnz   .error
 
+  ; Supports LBA?
+  test  byte  [edi+99],1
+  jz    .error
+
   ; Supports LBA48?
   test  byte [edi+167],0x04   ; Supports LBA48? ZF=1 is NO.
   jz    .only_lba28
@@ -534,7 +538,6 @@ read_sectors:
   inc   edx
   shr   eax,16
   out   dx,al
-
   inc   edx
   shr   esi,24      ; Separate LBA[27:24]
   and   esi,0x0f
@@ -580,7 +583,7 @@ read_sectors:
 ; TODO: ...
 
 ;===============================================
-; HEAP space
+; DATA space (always at the end of binary).
 ;===============================================
   align 4
 heap:
