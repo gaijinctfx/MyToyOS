@@ -37,7 +37,7 @@ _start:
   ;---
   mov   dl,[drivenum]
   xor   cx,cx
-  mov   al,1
+  mov   ax,0x0201
   lea   bx,[heap]
   int   0x13
   jc    .read_error
