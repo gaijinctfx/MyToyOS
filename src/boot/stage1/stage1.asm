@@ -379,6 +379,7 @@ hdd_io_ports:
 ;           AL = drive
 ;   Exit:
 ;           EDX:EAX = sectors count.
+;           CL = maximum sectors per read.
 ;           CF=0, ok; CF=1, error
 ;           ZF=0, support LBA48; ZF=1, only LBA28
 ;
@@ -414,6 +415,8 @@ get_hdd_info:
   in    ax,dx
   test  ax,0x8000
   jnz   .error
+
+  ; TODO: ... get maximum sectors per read here later!
 
   ; Gets maximum LBA28 sectors count.
   xor   esi,esi
@@ -452,6 +455,8 @@ get_hdd_info:
   mov   [esp+4],eax
 
 .exit:
+  mov   cl,128           ; FIXME: 128 sectors per read.
+                         ;        Will get, later, from IDENTIFY.
   mov   eax,[esp]
   mov   edx,[esp+4]
   add   esp,8
@@ -540,9 +545,9 @@ read_sectors:
   or    eax,esi     ; Write them.
   out   dx,al
 
-  ; Write Command READ_MULTIPLE.
+  ; Write Command READ_SECTORS.
   inc   edx
-  mov   al,0xc4
+  mov   al,0x20
   out   dx,al
   
   ; Waits 400ns and waits for (!BSY | RDY)
