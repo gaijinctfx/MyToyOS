@@ -29,12 +29,10 @@ static inline void _delay400ns(uint16_t port)
 
 int identify_device(uint8_t disk, struct device_id_s *did_ptr)
 {
-  uint8_t buffer[256], *ptr;
+  uint8_t buffer[256];
 
-  uint16_t port;
+  uint16_t port, csum;
   uint8_t  status;
-  int      count;
-  _Bool     isATA;
 
   if (!(disk & 0x80))
     return 1;
@@ -59,6 +57,11 @@ int identify_device(uint8_t disk, struct device_id_s *did_ptr)
   if (buffer[0] & 0x8000)
     return 1;
 
+  // test the checksum.
+  csum = calc_csum16(buffer, 510);
+  if (csum != buffer[255])
+    return 1;
+
   did_ptr->supports_lba = ((buffer[49] & 0x100) != 0);
   did_ptr->supports_lba48 = ((buffer[83] & 0x400) != 0);
   did_ptr->max_xfer_sectors = buffer[47] & 0xff;
@@ -68,12 +71,9 @@ int identify_device(uint8_t disk, struct device_id_s *did_ptr)
 
 int read_sectors(uint8_t disk, uint64_t start, uint8_t sectors_count, void *buffer)
 {
-  uint16_t *ptr = buffer;
   uint16_t port;
   uint8_t device;
   uint8_t status;
-  uint32_t count;
-  _Bool isLBA48;
 
   if (!(disk & 0x80))
     return 1;
