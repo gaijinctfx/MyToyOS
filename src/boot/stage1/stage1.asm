@@ -11,3 +11,9 @@ _start:
   mov   ds,ax
   mov   es,ax
   jmp   main
+
+bits 32
+
+global  jmp2kernel
+jmp2kernel:
+  jmp   8:0x100000
