@@ -14,7 +14,7 @@ bits 16
 
 org 0
 
-; this is @ 0:0x600
+; this is @ 0x60:0
 ; Will enter here with:
 ;   DL = drivenum
 ;   EAX = start LBA28 partition sector.

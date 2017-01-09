@@ -67,7 +67,7 @@ _start:
   mov   eax,[dap_start]
   dec   eax                   ; EAX has the partition start LBA28 now.
   mov   ecx,[sectors_count]   ; ECX has the partition sectors count now.
-  jmp   0:0x600     ; Jump to stage1.
+  jmp   0x60:0     ; Jump to stage1.
 
 .read_error:
   mov   si,stage1_read_error
