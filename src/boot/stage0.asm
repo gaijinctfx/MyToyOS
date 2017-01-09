@@ -11,15 +11,15 @@ org 0
   jmp 0x07c0:_start
 
 ;--------
-; Drive geometry descriptor
 ;--------
-drivenum:       db  0
+drivenum:       db  0x80  ; Set by disk formating...
+sectors_count:  dd  0     ; Will be set below.
 
 _start:
   cld
   mov   ax,cs
   mov   ds,ax
-  mov   es,ax
+  mov   es,ax         ; we'll need es soon.
 
   ; Puts the stack at the end of lower RAM.
   cli
@@ -29,6 +29,7 @@ _start:
   mov   sp,ax
   sti
 
+  ; Show a small message warning we're booting...
   mov   si,boot_string
   call  putstr
 
@@ -36,17 +37,20 @@ _start:
   ; Read partition table to get the starting lba.
   ;---
   mov   dl,[drivenum]
-  xor   cx,cx
-  mov   ax,0x0201
-  lea   bx,[heap]
+  xor   dh,dh                  ; head 0.
+  mov   cx,1                   ; Cylinder 0, sector 1.
+  mov   ax,0x0201              ; 1 sector to read.
+  lea   bx,[heap]              ; read to es:bx (heap).
   int   0x13
   jc    .read_error
   and   dl,0x03
   movzx bx,dl
   shl   bx,4
-  mov   eax,[heap+0x1be+bx+8]    ; Get starting LBA28.
-  inc   eax
+  mov   eax,[heap+0x1be+bx+8] ; Get starting LBA28.
+  inc   eax                   ; stage 1 is after the stage0.
   mov   [dap_start],eax
+  mov   eax,[heap+0x1be+bx+12]
+  mov   [sectors_count],eax
 
   ;...
   ; Read the stage1 and jump to it, unless we got an
@@ -57,6 +61,11 @@ _start:
   mov   ah,0x42
   int   0x13        ; Read the sectors.
   jc    .read_error
+
+  ; NOTE: DL still have drivenum!
+  mov   eax,[dap_start]
+  dec   eax                   ; EAX has the partition start LBA28 now.
+  mov   ecx,[sectors_count]   ; ECX has the partition sectors count now.
   jmp   0:0x600     ; Jump to stage1.
 
 .read_error:
