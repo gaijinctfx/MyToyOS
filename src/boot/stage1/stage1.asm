@@ -15,9 +15,15 @@ bits 16
 org 0
 
 ; this is @ 0:0x600
+; Will enter here with:
+;   DL = drivenum
+;   EAX = start LBA28 partition sector.
+;   ECX = number of partition sectors.
+;   DS = ES = 0
 _start:
-  push  cs
-  pop   ds
+  mov   [S1_ADDR(drivenum)],dl
+  mov   [S1_ADDR(partition_start_lba28)],eax
+  mov   [S1_ADDR(partition_sectors)],ecx
 
   ; OBS: At this point SS still points to 0x9000!
 
@@ -36,6 +42,7 @@ _start:
   jc    error_enabling_gate_a20
 
   lgdt  [global_descriptors_table_struct]
+
   mov   eax,cr0
   or    ax,1                  ; Set PE bit.
   mov   cr0,eax
@@ -180,6 +187,11 @@ check_enabled_a20:
   ret
 
 ;-------
+drivenum:               db  0x80
+partition_start_lba28:  dd  0
+partition_sectors:      dd  0
+
+;-------
 ; Global Descriptors Table
 ;
 ;     3                   2                   1  
@@ -202,21 +214,15 @@ global_descriptors_table_struct:
   align 8
 global_descriptors_table:
   ; NULL descriptor
-  dd  0,0
+  dq  0
 
   ; Selector 0x08: CS DPL=0,32b,4 GiB Limit,Base=0
-  dw  0xffff, 0
-  db  0
-  db  0x9a        ; Codeseg, execute/read, DPL=0
-  db  0xcf        ; 4 GiB, 32 bits
-  db  0
+  dd  0x0000ffff  ; Codeseg, Base=0, execute/read, DPL=0, 4 GiB, 32 bits. 
+  dd  0x00cf9a00
 
   ; Selector 0x10: DS DPL=0,32b,4 GiB limit,Base=0
-  dw  0xffff, 0
-  db  0
-  db  0x92        ; Dataseg, read/write, DPL=0
-  db  0xcf        ; 4 GiB, 32 bits
-  db  0
+  dd  0x0000ffff  ; Dataseg, Base=0, read/write, DPL=0, 4 GiB, 32 bits.
+  dd  0x00cf9200 
 global_descritors_table_end:
 
 ;===============================================
@@ -239,14 +245,14 @@ go32:
   mov   ax,0x10   ; Data selector
   mov   ds,ax
   mov   es,ax
-  ;mov   fs,ax
-  ;mov   gs,ax
 
   ; FIXME: Must choose an appropriate stack region!
+  ;        For now i'll use 0x9fffc (end of lower RAM).
   mov   ss,ax
   mov   esp,STKTOP
 
   ;TODO...
+  ; Loads kernel.
   ;...
 
   ; if everything is ok until now...
@@ -281,7 +287,7 @@ get_screen_page_base_addr:
 ; Destroys EAX, EDX, ESI, EDI and EBX.
 ;-------
 get_current_cursor_position_addr:
-  call  S1_ADDR(get_screen_page_base_addr)
+  call  get_screen_page_base_addr
   mov   esi,edi
   movzx ebx,byte [S1_ADDR(current_x)]
   movzx ecx,byte [S1_ADDR(current_y)]
@@ -314,20 +320,20 @@ advance_cursor:
   jmp   .advance_cursor_exit
 .scroll_up:
   mov   [S1_ADDR(current_x)],ah
-  call S1_ADDR(scroll_up)
+  call  scroll_up
   ret
 
 ;-------
 ; Scrolls page 1 line up:
 ;-------
 scroll_up:
-  call  S1_ADDR(get_screen_page_base_addr)
+  call  get_screen_page_base_addr
   mov   esi,edi
   add   esi,160
   mov   ecx,160*24
+  cld
   rep   movsb
   mov   ax,0x0720
-  mov   edi,esi
   mov   ecx,160
   rep   stosw
   ret
@@ -338,9 +344,10 @@ scroll_up:
 ;-------
 clear_screen:
   ; DF is always zero?!
-  call  S1_ADDR(get_screen_page_base_addr)
+  call  get_screen_page_base_addr
   mov   ecx,4000
   mov   ax,0x0720
+  cld
   rep   stosw
   ret
 
@@ -362,11 +369,11 @@ get_bios_current_screen_pos:
 ;-------
 putchar:
   mov   ecx,eax
-  call  S1_ADDR(get_current_cursor_position_addr)
+  call  get_current_cursor_position_addr
   mov   eax,ecx
   mov   ah,0x07
   stosw
-  call  S1_ADDR(advance_cursor)
+  call  advance_cursor
   ret
 
 ; Entry: ESI = buffer ptr
@@ -581,6 +588,157 @@ read_sectors:
 ;===============================================
 ; FileSystem Routines.
 ;===============================================
+; OBS: Each block has 4 KiB in size.
+;      1st block is boot block (reserved).
+;      2nd block is superblock.
+
+; structures.
+struc superblock
+.inodes_count:          resd  1
+.blocks_count_lo:       resd  1
+.root_blocks_count_lo:  resd  1   ; blocks allocated by root.
+.free_blocks_count_lo:  resd  1
+.free_inodes_count:     resd  1
+.first_data_block:      resd  1
+.log_block_size:        resd  1   ; block_size is 2^(10+log_block_size)
+.log_cluster_size:      resd  1   ; 2^(10+log_cluster_size) blocks if bigalloc enabled.
+.blocks_per_group:      resd  1
+.clusters_per_group:    resd  1   ; if bigalloc enabled.
+.inodes_per_group:      resd  1
+.mtime:                 resd  1   ; mount time.
+.wtime:                 resd  1   ; write time.
+.mnt_count:             resw  1   ; # of mounts since last fsck.
+.max_mnt_count:         resw  1
+.magic:                 resw  1
+.state:                 resw  1
+.errors:                resw  1
+.minor_rev_level:       resw  1
+.lastcheck:             resd  1
+.checkinterval:         resd  1
+.creator_os:            resd  1   ; which should I use?
+.rev_level:             resd  1
+.def_resuid:            resw  1
+.def_resgid:            resw  1
+
+.first_ino:             resd  1
+.inode_size:            resw  1   ; in bytes.
+.block_group_nr:        resw  1
+.feature_compat:        resd  1
+.feature_incompat:      resd  1
+.feature_ro_compat:     resd  1
+.uuid:                  resb  16  ; Volume UUID.
+.volume_name:           resb  16  ; label.
+.last_mounted_dir:      resb  64
+.algo_usage_bitmap:     resd  1
+
+.prealloc_blocks:       resb  1
+.prealloc_dir_blocks:   resb  1
+.reserved_gdt_blocks:   resw  1
+
+.journal_data:          resb  128 ; don't care about journaling right now!
+
+.blocks_count_hi:       resd  1
+.root_blocks_count_hi:  resd  1
+.free_blocks_count_hi:  resd  1
+.min_extra_size:        resw  1
+.want_extra_size:       resw  1
+.flags:                 resd  1
+.raid_stride:           resw  1
+.mmp_interval:          resw  1
+.mmp_block:             resq  1
+.raid_stripe_width:     resd  1
+.log_groups_per_flex:   resb  1
+.checksum_type:         resb  1
+.reserved1:             resw  1
+.kbytes_writen:         resq  1
+.snapshot_inum:         resd  1
+.snapshot_id:           resd  1
+.snapshot_root_blocks_count:  resq  1
+.snapshot_list:         resd  1
+.error_count:           resd  1
+.first_error_time:      resd  1
+.first_error_ino:       resd  1
+.first_error_block:     resq  1
+.first_error_func:      resb  32
+.first_error_line:      resd  1
+.last_error_time:       resd  1
+.last_error_ino:        resd  1
+.last_error_line:       resd  1
+.last_error_block:      resq  1
+.last_error_func:       resb  32
+.mount_opts:            resb  64
+.usr_quota_inum:        resd  1
+.grp_quota_inum:        resd  1
+.overhead_blocks:       resd  1
+.backup_bgs:            resd  2
+.encrypt_algos:         resb  4
+.encrypt_pw_salt:       resb  16
+.lpf_ino:               resd  1
+.prj_quota_inum:        resd  1
+.checksum_seed:         resd  1
+.reserved2:             resd  98
+.checksum:              resd  1     ; Superblock checksum.
+endstruc
+
+struc group_descriptor
+.block_bitmap_lo:       resd  1
+.inode_bitmap_lo:       resd  1
+.inode_table_lo:        resd  1
+.free_blocks_count_lo:  resw  1
+.free_inodes_count_lo:  resw  1
+.used_dirs_count_lo:    resw  1
+.flags:                 resw  1
+.exclude_bitmap_lo:     resd  1
+.block_bitmap_csum_lo:  resw  1
+.inode_bitmap_csum_lo:  resw  1
+.itable_unused_lo:      resw  1
+.checksum:              resw  1
+
+.block_bitmap_hi:       resd  1
+.inode_bitmap_hi:       resd  1
+.inode_table_hi:        resd  1
+.free_blocks_count_hi:  resw  1
+.free_inodes_count_hi:  resw  1
+.used_dirs_count_hi:    resw  1
+.itable_unused_hi:      resw  1
+.exclude_bitmap_hi:     resd  1
+.block_bitmap_csum_hi:  resw  1
+.inode_bitmap_csum_hi:  resw  1
+.reserved:              resd  1
+endstruc
+
+struc inode
+.mode:        resw  1
+.uid:         resw  1
+.size_lo:     resd  1
+.atime:       resd  1
+.ctime:       resd  1
+.mtime:       resd  1
+.dtime:       resd  1
+.gid:         resw  1
+.links_count: resw  1
+.blocks_lo:   resd  1
+.flags:       resd  1
+.osd1:        resd  1
+.block:       resb  60
+.generation:  resd  1
+.file_acl_lo: resd  1
+.size_high:
+.dir_acl:     resd  1
+.obso_faddr:  resd  1
+.osd2:        resb  12
+.extra_size:  resw  1
+.checksum_hi: resw  1
+.ctime_extra: resd  1
+.mtime_extra: resd  1
+.atime_extra: resd  1
+.crtime:      resd  1
+.crtime_extra: resd  1
+.version_hi:  resd  1
+.projid:      resd  1
+endstruc
+
+
 ; TODO: ...
 
 ;===============================================
