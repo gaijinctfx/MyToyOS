@@ -1,5 +1,9 @@
-// gcc -O3 -m16 -ffreestanding -nostdlib -S pio.c
+// stage1 32bit pm disk i/o routines.
+//
+// gcc -O3 -m32 -ffreestanding -nostdlib -S pio.c
+//
 #include "hw_io.h"
+#include "utils.h"
 
 struct device_id_s {
   int   supports_lba:1;
@@ -8,7 +12,20 @@ struct device_id_s {
   uint8_t max_xfer_sectors;
 };
 
-static uint16_t hdd_io_ports[4] = { 0x1f0, 0x1f0, 0x170, 0x170 };
+// 
+static const uint16_t hdd_io_ports[4] = { 0x1f0, 0x1f0, 0x170, 0x170 };
+
+// OBS; DS=ES=SS.
+static inline void _rdblocks(uint8_t count, void *ptr)
+{
+  __asm__ __volatile__( "rep; insw" : : "S" (ptr), "c" ((uint32_t)count * 256) );
+}
+
+static inline void _delay400ns(uint16_t port)
+{ (void)inpb(port+7);
+  (void)inpb(port+7); 
+  (void)inpb(port+7); 
+  (void)inpb(port+7);  }
 
 int identify_device(uint8_t disk, struct device_id_s *did_ptr)
 {
@@ -22,29 +39,28 @@ int identify_device(uint8_t disk, struct device_id_s *did_ptr)
   if (!(disk & 0x80))
     return 1;
 
-  port = hdd_io_ports[disk & 3];
+  port = ((uint16_t *)_data_ptr(hdd_io_ports))[disk & 3];
 
   // Set device, and issue command.
   outpb(port+6, (disk << 3) & 0x10);
   outpb(port+7, 0xec);    // send IDENTIFY_DEVICE cmd.
 
   // Wait for !BUSY & DRDY.
+  _delay400ns(port);
   while (((status = inpb(port+7)) & 0xc0) != 0x40);
 
   // Is there an error?!
   if (status & 1)
     return 1;
 
-  ptr = buffer;
-  count = 256;
-  while (count--)
-    *ptr++ = inpw(port);
+  _rdblocks(1, buffer);
       
+  // If isn't ATA, return with error.
   if (buffer[0] & 0x8000)
     return 1;
 
-  did_ptr->supports_lba = (buffer[49] & 0x100);
-  did_ptr->supports_lba48 = buffer[83] & 0x400;
+  did_ptr->supports_lba = ((buffer[49] & 0x100) != 0);
+  did_ptr->supports_lba48 = ((buffer[83] & 0x400) != 0);
   did_ptr->max_xfer_sectors = buffer[47] & 0xff;
 
   return 0;
@@ -62,7 +78,7 @@ int read_sectors(uint8_t disk, uint64_t start, uint8_t sectors_count, void *buff
   if (!(disk & 0x80))
     return 1;
 
-  port = hdd_io_ports[disk & 3];
+  port = ((uint16_t *)_data_ptr(hdd_io_ports))[disk & 3];
 
   device = ((disk << 3) | 0x40) & 0x50;
   if (start > 0xfffffff)
@@ -90,14 +106,14 @@ int read_sectors(uint8_t disk, uint64_t start, uint8_t sectors_count, void *buff
     outpb(port+7, 0x20);    // READ_SECTORS
   }
 
+  _delay400ns(port);
   while (((status = inpb(port+7)) & 0xc0) != 0x40);
 
   if (status & 1)
     return 1;
 
-  count = sectors_count * 256;
-  while (count--)
-    *ptr++ = inpw(port);
+  _rdblocks(sectors_count, buffer);
 
   return 0;
 }
+
