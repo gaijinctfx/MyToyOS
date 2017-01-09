@@ -33,6 +33,7 @@ _start:
   mov   si,boot_string
   call  putstr
 
+  ; FIXME: Maybe this is not a good idea 'cause GPT can be used!
   ;---
   ; Read partition table to get the starting lba.
   ;---

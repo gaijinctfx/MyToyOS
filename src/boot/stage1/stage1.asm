@@ -22,8 +22,8 @@ org 0
 ;   DS = ES = 0
 _start:
   mov   [S1_ADDR(drivenum)],dl
-  mov   [S1_ADDR(partition_start_lba28)],eax
-  mov   [S1_ADDR(partition_sectors)],ecx
+  mov   [S1_ADDR(partition_start_lba28)],eax    ; FIXME: And LBA48?!
+  mov   [S1_ADDR(partition_sectors)],ecx        ; FIXME: And LBA48?!
 
   ; OBS: At this point SS still points to 0x9000!
 
@@ -188,8 +188,8 @@ check_enabled_a20:
 
 ;-------
 drivenum:               db  0x80
-partition_start_lba28:  dd  0
-partition_sectors:      dd  0
+partition_start_lba28:  dd  0     ; FIXME: And LBA48?!
+partition_sectors:      dd  0     ; FIXME: And LBA48?!
 
 ;-------
 ; Global Descriptors Table
@@ -593,6 +593,7 @@ read_sectors:
 ;      2nd block is superblock.
 
 ; structures.
+; FIXME: We'll use ext4fs?!
 struc superblock
 .inodes_count:          resd  1
 .blocks_count_lo:       resd  1
