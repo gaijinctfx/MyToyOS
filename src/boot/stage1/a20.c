@@ -3,6 +3,8 @@
 #include "hw_io.h"
 #include "macros.h"
 
+extern _Bool check_a20(void);
+
 static void enable_a20_fast(void)
 {
   _u8 cpa;
@@ -31,8 +33,6 @@ static void enable_a20_kbdc(void)
   wait_a20_1(); outpb(0x64, 0xae);
   wait_a20_1();
 }
-
-extern _Bool check_a20(void);
 
 _Bool enable_a20(void)
 {

@@ -64,6 +64,21 @@ check_a20:
   pop   ds
   ret
 
+global  real_puts
+; void real_puts(char *);
+real_puts:
+  cld
+  mov   si,[esp+4]
+.loop:
+  lodsb
+  test  al,al
+  jz    .exit
+  mov   ah,0x0e
+  int   0x10
+  jmp   .loop
+.exit:
+  ret
+
 ; 32 bit code.
 bits 32
 
