@@ -41,8 +41,8 @@ calc_chksum16:
   xor   edx,edx
   xor   eax,eax
   cld
-.loop:
   test  ecx,ecx
+.loop:
   jz    .loop_end
   mov   dl,[esi]
   add   ax,dx
