@@ -2,8 +2,8 @@
 //
 // gcc -O3 -m32 -ffreestanding -nostdlib -S pio.c
 //
-#include "typedefs.h"
-#include "hw_io.h"
+#include <typedefs.h>
+#include <hw_io.h>
 
 struct device_id_s {
   _Bool   supports_lba;

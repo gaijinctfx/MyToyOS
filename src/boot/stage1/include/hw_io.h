@@ -1,7 +1,7 @@
 #ifndef __hw_io_h__
 #define __hw_io_h__
 
-#include "typedefs.h"
+#include <typedefs.h>
 
 inline void disable_ints(void) { __asm__ __volatile__ ("cli"); }
 inline void enable_ints(void) { __asm__ __volatile__ ("sti"); }

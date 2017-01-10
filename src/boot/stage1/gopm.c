@@ -1,6 +1,6 @@
 // 16 bits code
-#include <stdint.h>
-#include "gdt.h"
+#include <typedefs.h>
+#include <gdt.h>
 
 struct gdt_s gdt[3] = {
   { 0 },    // NULL descriptor

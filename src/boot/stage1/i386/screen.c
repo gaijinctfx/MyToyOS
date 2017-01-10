@@ -1,5 +1,4 @@
-#include "../typedefs.h"
-#include "../macros.h"
+#include <typedefs.h>
 
 _u8 current_x, current_y;
 

@@ -1,7 +1,7 @@
 // 16 bits code.
-#include "typedefs.h"
-#include "hw_io.h"
-#include "macros.h"
+#include <typedefs.h>
+#include <hw_io.h>
+#include <macros.h>
 
 static void enable_a20_fast(void)
 { outpb(0x92, (inpb(0x92) | 0x02) & ~1); }
