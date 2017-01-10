@@ -41,29 +41,6 @@ _start:
 
   jmp   8:_main       ; Jumps to protected mode.
 
-
-global check_a20
-check_a20:
-  push  ds
-  push  es
-  xor   dx,dx
-  mov   ds,dx
-  mov   ax,-1
-  mov   es,ax
-
-  mov   cl,[0x500]    ; saves 0:0x500 byte.
-  mov   al,[es:0x510]
-  not   al
-  mov   [0x500],al
-  mov   dl,[es:0x510]
-  xor   al,dl
-  sete  al
-  mov   [0x500],cl
-
-  pop   es
-  pop   ds
-  ret
-
 global  real_puts
 ; void real_puts(char *);
 real_puts:
