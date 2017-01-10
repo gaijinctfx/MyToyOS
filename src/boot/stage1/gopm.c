@@ -1,4 +1,5 @@
 // 16 bits code
+#include <stdint.h>
 #include "gdt.h"
 
 struct gdt_s gdt[3] = {
@@ -9,8 +10,13 @@ struct gdt_s gdt[3] = {
 
 struct gdt_descriptor_s gdt_desc;
 
-void setup_gdt(void)
+extern void _main32(void);
+
+void __attribute__((noreturn)) go_pm(void)
 {
-  gdt_desc.limit = sizeof(gdt) - 1;
-  gdt_desc.base = (uint32_t)&gdt;
+  gdt_desc.base = (uint32_t)gdt;
+  gdt_desc.limit = sizeof(gdt)-1;
+
+  __asm__ __volatile__ ( "lgdt [gdt_desc]\n"
+                         "jmp 8:_main32" );
 }
