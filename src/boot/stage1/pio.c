@@ -2,42 +2,44 @@
 //
 // gcc -O3 -m32 -ffreestanding -nostdlib -S pio.c
 //
+#include "typedefs.h"
 #include "hw_io.h"
-#include "utils.h"
 
 struct device_id_s {
-  int   supports_lba:1;
-  int   supports_lba48:1;
+  _Bool   supports_lba;
+  _Bool   supports_lba48;
 
-  uint8_t max_xfer_sectors;
+  _u8 max_xfer_sectors;
 };
 
 // 
-static const uint16_t hdd_io_ports[4] = { 0x1f0, 0x1f0, 0x170, 0x170 };
+static const _u16 hdd_io_ports[4] = { 0x1f0, 0x1f0, 0x170, 0x170 };
 
 // OBS; DS=ES=SS.
-static inline void _rdblocks(uint8_t count, void *ptr)
+static inline void _rdblocks(_u8 count, void *ptr)
 {
-  __asm__ __volatile__( "rep; insw" : : "S" (ptr), "c" ((uint32_t)count * 256) );
+  __asm__ __volatile__( "rep; insw" : : "S" (ptr), "c" ((_u32)count * 256) );
 }
 
-static inline void _delay400ns(uint16_t port)
+static inline void _delay400ns(_u16 port)
 { (void)inpb(port+7);
   (void)inpb(port+7); 
   (void)inpb(port+7); 
   (void)inpb(port+7);  }
 
-int identify_device(uint8_t disk, struct device_id_s *did_ptr)
-{
-  uint8_t buffer[256];
+extern _u16 calc_chksum16(void *, _u32);
 
-  uint16_t port, csum;
-  uint8_t  status;
+int identify_device(_u8 disk, struct device_id_s *did_ptr)
+{
+  _u8 buffer[256];
+
+  _u16 port, csum;
+  _u8  status;
 
   if (!(disk & 0x80))
     return 1;
 
-  port = ((uint16_t *)_data_ptr(hdd_io_ports))[disk & 3];
+  port = hdd_io_ports[disk & 3];
 
   // Set device, and issue command.
   outpb(port+6, (disk << 3) & 0x10);
@@ -58,7 +60,7 @@ int identify_device(uint8_t disk, struct device_id_s *did_ptr)
     return 1;
 
   // test the checksum.
-  csum = calc_csum16(buffer, 510);
+  csum = calc_chksum16(buffer, 510);
   if (csum != buffer[255])
     return 1;
 
@@ -69,16 +71,16 @@ int identify_device(uint8_t disk, struct device_id_s *did_ptr)
   return 0;
 }
 
-int read_sectors(uint8_t disk, uint64_t start, uint8_t sectors_count, void *buffer)
+int read_sectors(_u8 disk, _u64 start, _u8 sectors_count, void *buffer)
 {
-  uint16_t port;
-  uint8_t device;
-  uint8_t status;
+  _u16 port;
+  _u8 device;
+  _u8 status;
 
   if (!(disk & 0x80))
     return 1;
 
-  port = ((uint16_t *)_data_ptr(hdd_io_ports))[disk & 3];
+  port = hdd_io_ports[disk & 3];
 
   device = ((disk << 3) | 0x40) & 0x50;
   if (start > 0xfffffff)

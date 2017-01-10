@@ -10,13 +10,4 @@ struct gdt_s gdt[3] = {
 
 struct gdt_descriptor_s gdt_desc;
 
-extern void _main32(void);
-
-void __attribute__((noreturn)) go_pm(void)
-{
-  gdt_desc.base = (uint32_t)gdt;
-  gdt_desc.limit = sizeof(gdt)-1;
-
-  __asm__ __volatile__ ( "lgdt [gdt_desc]\n"
-                         "jmp 8:_main32" );
-}
+// TODO...
