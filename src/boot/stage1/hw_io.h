@@ -6,17 +6,13 @@
 inline void disable_ints(void) { __asm__ __volatile__ ("cli"); }
 inline void enable_ints(void) { __asm__ __volatile__ ("sti"); }
 
-inline void outpb(_u16 port, _u8 data)
-{ __asm__ __volatile__( "outb %0,%1" : : "a" (data), "dN" (port)); }
+inline void outpb(_u16 port, _u8 data) { __asm__ __volatile__( "outb %0,%1" : : "a" (data), "dN" (port)); }
+inline void outpw(_u16 port, _u16 data) { __asm__ __volatile__( "outw %0,%1" : : "a" (data), "dN" (port)); }
+inline void outpd(_u16 port, _u32 data) { __asm__ __volatile__( "outl %0,%1" : : "a" (data), "dN" (port)); }
 
-inline void outpw(_u16 port, _u16 data)
-{ __asm__ __volatile__( "outw %0,%1" : : "a" (data), "dN" (port)); }
-
-inline _u8 inpb(_u16 port)
-{ _u8 data; __asm__ __volatile__( "inb %1,%0" : "=a" (data) : "dN" (port)); return data; }
-
-inline _u16 inpw(_u16 port)
-{ _u16 data; __asm__ __volatile__( "inw %1,%0" : "=a" (data) : "dN" (port)); return data; }
+inline _u8 inpb(_u16 port) { _u8 data; __asm__ __volatile__( "inb %1,%0" : "=a" (data) : "dN" (port)); return data; }
+inline _u16 inpw(_u16 port) { _u16 data; __asm__ __volatile__( "inw %1,%0" : "=a" (data) : "dN" (port)); return data; }
+inline _u32 inpd(_u16 port) { _u32 data; __asm__ __volatile__( "inl %1,%0" : "=a" (data) : "dN" (port)); return data; }
 
 // Stolen from limux! :)
 inline void io_delay(void) { __asm__ __volatile__ ( "outb %%al,$0x80" ); }
