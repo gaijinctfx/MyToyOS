@@ -3,6 +3,9 @@
 
 #include "typedefs.h"
 
+void inline disable_ints(void) { __asm__ __volatile__ ("cli"); }
+void inline enable_ints(void) { __asm__ __volatile__ ("sti"); }
+
 void inline outpb(_u16 port, _u8 data)
 { __asm__ __volatile__( "outb %0,%1" : : "a" (data), "dN" (port)); }
 

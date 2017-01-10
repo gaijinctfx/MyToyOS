@@ -10,4 +10,8 @@ struct gdt_s gdt[3] = {
 
 struct gdt_descriptor_s gdt_desc;
 
-// TODO...
+void setup_pm(void)
+{
+  gdt_desc.limit = sizeof(gdt)-1;
+  gdt_desc.base = (_u32)gdt;
+}

@@ -1,13 +1,19 @@
-bits 16
+section .data
+
+extern gdt_desc
 
 ; This section will begin at 0x60:0.
 section .text
 
 global _start
 
-extern _main
+extern _main32
+extern setup_pm
+
 extern _bss_start
 extern _bss_end
+
+bits 16
 
 _start:
   mov   ax,cs
@@ -24,10 +30,51 @@ _start:
   cld
   rep   stosb
 .nothing_to_cleanup:
-  jmp   _main
+  call  setup_pm
+
+  ; TODO...
+
+  lgdt  [gdt_desc]
+  mov   eax,cr0
+  or    eax,1
+  mov   cr0,eax
+
+  jmp   8:_main       ; Jumps to protected mode.
+
+
+global check_a20
+check_a20:
+  push  ds
+  push  es
+  xor   dx,dx
+  mov   ds,dx
+  mov   ax,-1
+  mov   es,ax
+
+  mov   cl,[0x500]    ; saves 0:0x500 byte.
+  mov   al,[es:0x510]
+  not   al
+  mov   [0x500],al
+  mov   dl,[es:0x510]
+  xor   al,dl
+  sete  al
+  mov   [0x500],cl
+
+  pop   es
+  pop   ds
+  ret
 
 ; 32 bit code.
 bits 32
+
+_main:
+  mov   ax,0x10
+  mov   ds,ax
+  mov   es,ax
+  mov   ss,ax
+  mov   esp,0x9fffc   ; ESP back to lower RAM top.
+  call  _main32
+  jmp   8:0x100000    ; jumps to kernel.
 
 struc calc_csum16_stk
 .bufferptr: resd  1
@@ -53,6 +100,3 @@ calc_chksum16:
 .loop_end:
   ret  
 
-global  jmp2kernel
-jmp2kernel:
-  jmp   8:0x100000

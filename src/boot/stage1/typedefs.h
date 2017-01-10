@@ -1,6 +1,9 @@
 #ifndef __typedefs_h__
 #define __typedefs_h__
 
+#define true 1
+#define false 0
+
 typedef char _i8;
 typedef short _i16;
 typedef int _i32;
