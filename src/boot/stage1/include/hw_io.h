@@ -3,9 +3,6 @@
 
 #include <typedefs.h>
 
-inline void disable_ints(void) { __asm__ __volatile__ ("cli"); }
-inline void enable_ints(void) { __asm__ __volatile__ ("sti"); }
-
 inline void outpb(_u16 port, _u8 data) { __asm__ __volatile__( "outb %0,%1" : : "a" (data), "dN" (port)); }
 inline void outpw(_u16 port, _u16 data) { __asm__ __volatile__( "outw %0,%1" : : "a" (data), "dN" (port)); }
 inline void outpd(_u16 port, _u32 data) { __asm__ __volatile__( "outl %0,%1" : : "a" (data), "dN" (port)); }
@@ -43,5 +40,11 @@ inline void wr_gs16(_u16 addr, _u16 data) { __asm__ __volatile__ ( "movw %0,%%gs
 inline void wr_es32(_u16 addr, _u32 data) { __asm__ __volatile__ ( "movl %0,%%es:%1" : : "ri" (data), "m" (*(_u32 *)addr) ); }
 inline void wr_fs32(_u16 addr, _u32 data) { __asm__ __volatile__ ( "movl %0,%%fs:%1" : : "ri" (data), "m" (*(_u32 *)addr) ); }
 inline void wr_gs32(_u16 addr, _u32 data) { __asm__ __volatile__ ( "movl %0,%%gs:%1" : : "ri" (data), "m" (*(_u32 *)addr) ); }
+
+inline void disable_ints(void) { __asm__ __volatile__ ("cli"); }
+inline void enable_ints(void) { __asm__ __volatile__ ("sti"); }
+
+inline void disable_nmi(void) { outpb(0x70, inpb(0x70) | 0x80); }
+inline void enable_nmi(void) { outpb(0x70, inpb(0x70) & 0x7f); }
 
 #endif
