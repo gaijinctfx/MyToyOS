@@ -7,6 +7,21 @@ static void enable_a20_fast(void) { outpb(0x92, (inpb(0x92) | 0x02) & ~1); }
 static void wait_kbdc(void) { while (inpb(0x64) & 2) { io_delay(); } }
 static void discard_kbdc_data(void) { while ((inpb(0x64) & 1)) { io_delay(); (void)inpb(0x60); } }
 
+static _Bool enable_a20_int15h(void)
+{
+  _Bool r;
+
+  __asm__ __volatile__ (
+    "movw %1,%%ax\n"
+    "int 0x15\n"
+    "movb $0,%%al\n"
+    "setc al"
+    : "=a" (r) : "i" ((_u16)0x2401)
+  );
+
+  return r;
+}
+
 static void enable_a20_kbdc(void)
 {
   wait_kbdc(); outpb(0x64, 0xad);   // turn kbd off.
@@ -44,6 +59,9 @@ static _Bool check_a20(void)
 _Bool enable_a20(void)
 {
   _Bool r = true;
+
+  if (enable_a20_int15h())
+    return true;
 
   enable_a20_fast();
   if (!check_a20())
