@@ -7,8 +7,8 @@
 
 struct gdt_s gdt[3] = {
   { 0 },    // NULL descriptor
-  { 0xffff, 0, 0x9a, 0xf, 0xc, 0 },    // code descriptor.
-  { 0xffff, 0, 0x92, 0xf, 0xc, 0 }     // data descriptror.
+  { 0xffff, 0, GDT_SYSFLAG | GDT_PFLAG | GDT_DPL(0) | GDT_TYPE_XR,  0xf, GDT_GFLAG | GDT_DBFLAG, 0 },    // code descriptor.
+  { 0xffff, 0, GDT_SYSFLAG | GDT_PFLAG | GDT_DPL(0) | GDT_TYPE_DRW, 0xf, GDT_GFLAG | GDT_DBFLAG, 0 }     // data descriptror.
 };
 
 struct gdt_descriptor_s gdt_desc;

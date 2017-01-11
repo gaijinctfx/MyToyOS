@@ -71,3 +71,13 @@ void puts(char *s)
   for (; *s; s++)
     putchar(*s);
 }
+
+void gotoxy(_i8 x, _i8 y)
+{
+  if (x < 0) x = 0;
+  if (x >= 80) x = 79;
+  if (y < 0) y = 0;
+  if (y >= 25) y = 24;
+  current_x = x;
+  current_y = y;
+}
