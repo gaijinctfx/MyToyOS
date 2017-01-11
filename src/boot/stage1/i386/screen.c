@@ -24,11 +24,15 @@ void scroll_up(void)
 {
   __asm__ __volatile__ (
     "movl $0xb8000,%%edi\n"
+
+    // scroll up
     "movl %%edi,%%esi\n"
     "add  $160,%%esi\n"
-    "movl $1920,%%ecx\n"
+    "movl $1920,%%ecx\n"    // 1920 words.
     "cld\n"
     "rep; movsw\n"
+
+    // clear last line.
     "movw $0x0720,%%ax\n"
     "mov  $80,%%ecx\n"
     "rep; stosw\n" : : : "edi", "esi"
@@ -39,11 +43,10 @@ void putchar(char c)
 {
   _u8 *ptr = (_u8 *)0xb8000 + 160 * current_y + 2*current_x;
 
-  if (c == '\n')
+  switch (c)
   {
-    current_x = 0;
-    current_y++;
-    goto update_y;
+    case '\n':  current_y++; goto update_y;
+    case '\r':  current_x = 0; break;
   }
 
   *ptr++ = 0x07;

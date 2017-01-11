@@ -50,18 +50,12 @@ _Bool enable_a20(void)
 {
   _Bool r = true;
 
-  // FIXME: Maybe this is unecessary here!
-  disable_ints();
-
   enable_a20_fast();
   if (!check_a20())
   {
     enable_a20_kbdc();
     r = check_a20();
   }
-
-  // FIXME: Maybe this is unecessary here!
-  enable_ints();
 
   return r;
 }

@@ -47,4 +47,6 @@ inline void enable_ints(void) { __asm__ __volatile__ ("sti"); }
 inline void disable_nmi(void) { outpb(0x70, inpb(0x70) | 0x80); }
 inline void enable_nmi(void) { outpb(0x70, inpb(0x70) & 0x7f); }
 
+inline void halt(void) { do { __asm__ __volatile__ ("hlt"); } while (1); }
+
 #endif
