@@ -15,11 +15,11 @@ struct device_id_s {
 // 
 static const _u16 hdd_io_ports[4] = { 0x1f0, 0x1f0, 0x170, 0x170 };
 
+extern _u16 calc_chksum16(void *, _u32);
+
 // OBS; DS=ES=SS.
 static inline void _rdblocks(_u8 count, void *ptr)
-{
-  __asm__ __volatile__( "rep; insw" : : "S" (ptr), "c" ((_u32)count * 256) );
-}
+{ __asm__ __volatile__( "rep; insw" : : "S" (ptr), "c" ((_u32)count * 256) ); }
 
 static inline void _delay400ns(_u16 port)
 { (void)inpb(port+7);
@@ -27,7 +27,10 @@ static inline void _delay400ns(_u16 port)
   (void)inpb(port+7); 
   (void)inpb(port+7);  }
 
-extern _u16 calc_chksum16(void *, _u32);
+// 0x3f6 = primary controller on local bus DCR (Device Control Register).
+// sets the SRST bit. A command will reset it.
+static inline void _softreset(void)
+{ outpb(0x3f6, inpb(0x3f6) | 0x4); }
 
 int identify_device(_u8 disk, struct device_id_s *did_ptr)
 {
@@ -40,6 +43,8 @@ int identify_device(_u8 disk, struct device_id_s *did_ptr)
     return 1;
 
   port = hdd_io_ports[disk & 3];
+
+  _softreset();
 
   // Set device, and issue command.
   outpb(port+6, (disk << 3) & 0x10);
@@ -81,8 +86,10 @@ int read_sectors(_u8 disk, _u64 start, _u8 sectors_count, void *buffer)
     return 1;
 
   port = hdd_io_ports[disk & 3];
-
   device = ((disk << 3) | 0x40) & 0x50;
+
+  _softreset();
+
   if (start > 0xfffffff)
   {
     outpb(port+2, 0);
