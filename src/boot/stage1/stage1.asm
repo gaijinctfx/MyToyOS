@@ -5,40 +5,41 @@ extern gdt_desc
 ; This section will begin at 0x60:0.
 section .text
 
-global _start
-
+extern _bss_start
+extern _bss_end
 extern _main32
 extern setup_pm
 
-extern _bss_start
-extern _bss_end
-
 bits 16
 
+global _start
 _start:
   mov   ax,cs
   mov   ds,ax
   mov   es,ax
   mov   esp,0xfffc    ; To be sure we are at stack top.
+                      ; SS still points to 0x9000.
 
-  ; Clean up bss section
+  ; Clears bss section
   mov   edi,_bss_start
   mov   ecx,_bss_end
-  sub   ecx,edi
-  jz    .nothing_to_cleanup
+  sub   ecx,edi       ; ECX is the size, in bytes.
+  jz    .nothing_to_clear
   xor   al,al
   cld
-  rep   stosb
-.nothing_to_cleanup:
+  rep   stosb         ; Fill with zeroes.
+.nothing_to_clear:
   call  setup_pm
+  test  eax,eax
+  jnz   halt
 
   ; TODO...
 
+  cli                 ; No interrupts.
   lgdt  [gdt_desc]
   mov   eax,cr0
   or    eax,1
   mov   cr0,eax
-
   jmp   8:_main       ; Jumps to protected mode.
 
 global  real_puts
@@ -65,7 +66,13 @@ _main:
   mov   es,ax
   mov   ss,ax
   mov   esp,0x9fffc   ; ESP back to lower RAM top.
-  call  _main32
+  call  _main32       ; _main32 will load the kernel!
+  test  eax,eax       ; Returns 0 if OK, 1 if error.
+  jnz   goto_kernel
+halt:
+  hlt
+  jmp   halt 
+goto_kernel:
   jmp   8:0x100000    ; jumps to kernel.
 
 struc calc_csum16_stk

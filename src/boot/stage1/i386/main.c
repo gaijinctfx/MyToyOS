@@ -1,5 +1,6 @@
 // 32 bit code
 
-void __attribute__((noreturn)) _main32(void)
+int _main32(void)
 {
+  return 0;   // return OK.
 }

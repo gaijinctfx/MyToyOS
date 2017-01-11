@@ -4,7 +4,6 @@
 ;======================================
 
 bits 16
-
 org 0
 
   ; Makes sure we're in the correct segment.
@@ -25,12 +24,16 @@ _start:
   cli
   mov   ax,0x9000
   mov   ss,ax
-  mov   ax,-4
+  mov   ax,0xfffc
   mov   sp,ax
   sti
 
+  ; Setup video mode.
+  mov   ax,3          ; 80x25 16 color text mode.
+  int   0x10
+
   ; Show a small message warning we're booting...
-  mov   si,boot_string
+  lea   si,[hello_msg]
   call  putstr
 
   ; FIXME: Maybe this is not a good idea 'cause GPT can be used!
@@ -70,12 +73,13 @@ _start:
   jmp   0:0x600     ; Jump to stage1.
 
 .read_error:
-  mov   si,stage1_read_error
+  lea   si,[stage1_read_error_msg]
   call  putstr
 
 sys_halt:
-  mov   si,sys_halted_error
+  lea   si,[sys_halted_error_msg]
   call  putstr
+
 .hlt_loop:
   hlt
   jmp   .hlt_loop    ; Just in case some IRQ/NMI wakes the cpu up!
@@ -84,6 +88,7 @@ sys_halt:
 ; void putstr(char *s);
 ;
 ; Entry: DS:SI = s
+; Destroys: AX, SI.
 ;
 ; OBS: Direction Flag must be cleared.
 ;-------------
@@ -100,11 +105,11 @@ putstr:
 ;-----------
 ; Strings
 ;-----------
-boot_string:
+hello_msg:
   db    "Stage0: Loading Stage1...",13,10,0
-stage1_read_error:
+stage1_read_error_msg:
   db    "Error trying to read stage 1 sectors!",13,10,0
-sys_halted_error:
+sys_halted_error_msg:
   db    "System Halted!",13,10,0
 
 ;-----------

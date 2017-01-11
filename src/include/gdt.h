@@ -3,6 +3,7 @@
 
 #include <typedefs.h>
 
+// Structure to load into GDTR.
 struct gdt_descriptor_s {
   _u32 base;
   _u16 limit;
@@ -32,15 +33,17 @@ struct gdt_s {
   _u64 base_hi:8;
 };
 
+// Bitfields to use in type field.
 #define GDT_SYSFLAG     0x10
 #define GDT_PFLAG       0x80
 #define GDT_DPL(p) (((p) & 0x03) << 1)
+#define GDT_TYPE_XR   0x0a
+#define GDT_TYPE_DRW  0x02
 
+// Bitfields to use in flags field.
 #define GDT_GFLAG   0x08
 #define GDT_DBFLAG  0x04
 #define GDT_AVLFLAG 0x01
 
-#define GDT_TYPE_XR   0x0a
-#define GDT_TYPE_DRW  0x02
 
 #endif

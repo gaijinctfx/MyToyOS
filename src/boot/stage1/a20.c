@@ -3,14 +3,9 @@
 #include <hw_io.h>
 #include <macros.h>
 
-static void enable_a20_fast(void)
-{ outpb(0x92, (inpb(0x92) | 0x02) & ~1); }
-
-static void wait_kbdc(void)
-{ while (inpb(0x64) & 2) { io_delay(); } }
-
-static void discard_kbdc_data(void)
-{ while ((inpb(0x64) & 1)) { io_delay(); (void)inpb(0x60); } }
+static void enable_a20_fast(void) { outpb(0x92, (inpb(0x92) | 0x02) & ~1); }
+static void wait_kbdc(void) { while (inpb(0x64) & 2) { io_delay(); } }
+static void discard_kbdc_data(void) { while ((inpb(0x64) & 1)) { io_delay(); (void)inpb(0x60); } }
 
 static void enable_a20_kbdc(void)
 {
