@@ -4,18 +4,10 @@
 //
 #include <typedefs.h>
 #include <hw_io.h>
+#include <pio.h>
+#include <misc.h>
 
-struct device_id_s {
-  _Bool   supports_lba;
-  _Bool   supports_lba48;
-
-  _u8 max_xfer_sectors;
-};
-
-// 
 static const _u16 hdd_io_ports[4] = { 0x1f0, 0x1f0, 0x170, 0x170 };
-
-extern _u16 calc_chksum16(void *, _u32);
 
 // OBS; DS=ES=SS.
 static inline void _rdblocks(_u8 count, void *ptr)
@@ -32,6 +24,7 @@ static inline void _delay400ns(_u16 port)
 static inline void _softreset(void)
 { outpb(0x3f6, inpb(0x3f6) | 0x4); }
 
+// NOTE: Need to be called before read_sectors() to get info.
 int identify_device(_u8 disk, struct device_id_s *did_ptr)
 {
   _u8 buffer[256];
@@ -76,7 +69,7 @@ int identify_device(_u8 disk, struct device_id_s *did_ptr)
   return 0;
 }
 
-int read_sectors(_u8 disk, _u64 start, _u8 sectors_count, void *buffer)
+int read_sectors(_u8 disk, _u64 start, _u8 sectors_count, void *buffer, struct device_id_s *did)
 {
   _u16 port;
   _u8 device;
@@ -88,10 +81,22 @@ int read_sectors(_u8 disk, _u64 start, _u8 sectors_count, void *buffer)
   port = hdd_io_ports[disk & 3];
   device = ((disk << 3) | 0x40) & 0x50;
 
-  _softreset();
+  // Trying to transfer more then max_xfer_sectors? error!
+  if (sectors_count > did->max_xfer_sectors)
+    return 1;
+
+  // Does not support lba? error!
+  if (!did->supports_lba)
+    return 1;
 
   if (start > 0xfffffff)
   {
+    // Does not support lba48? error!
+    if (!did->supports_lba48)
+      return 1;
+
+    _softreset();
+
     outpb(port+2, 0);
     outpb(port+3, (start >> 24) & 0xff);
     outpb(port+4, (start >> 32) & 0xff);
@@ -107,10 +112,13 @@ int read_sectors(_u8 disk, _u64 start, _u8 sectors_count, void *buffer)
   }
   else
   {
+    _softreset();
+
     outpb(port+2, sectors_count);
     outpb(port+3, start & 0xff); start >>= 8;
     outpb(port+4, start & 0xff); start >>= 8;
     outpb(port+5, start & 0xff); start >>= 8;
+
     outpb(port+6, device | (start & 0x0f));
     outpb(port+7, 0x20);    // READ_SECTORS
   }
