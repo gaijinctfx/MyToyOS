@@ -14,17 +14,21 @@ static inline void _rdblocks(_u8 count, void *ptr)
 { __asm__ __volatile__( "rep; insw" : : "S" (ptr), "c" ((_u32)count * 256) ); }
 
 static inline void _delay400ns(_u16 port)
-{ (void)inpb(port+7);
-  (void)inpb(port+7); 
-  (void)inpb(port+7); 
-  (void)inpb(port+7);  }
+{
+  (void)inpb(port+7);
+  (void)inpb(port+7);
+  (void)inpb(port+7);
+  (void)inpb(port+7);
+}
 
 // 0x3f6 = primary controller on local bus DCR (Device Control Register).
-// sets the SRST bit. A command will reset it.
-static inline void _softreset(void)
-{ outpb(0x3f6, inpb(0x3f6) | 0x4); }
+// sets the SRST bit. A new command will reset it.
+static inline void _softreset(void) { outpb(0x3f6, inpb(0x3f6) | 0x4); }
+
+static _Bool _is_device_ready(_u16 port, _u8 *status) { return ((*status = inpb(port+7)) & 0xc0) == 0x40; }
 
 // NOTE: Need to be called before read_sectors() to get info.
+// return 0 means OK.
 int identify_device(_u8 disk, struct device_id_s *did_ptr)
 {
   _u8 buffer[256];
@@ -45,14 +49,14 @@ int identify_device(_u8 disk, struct device_id_s *did_ptr)
 
   // Wait for !BUSY & DRDY.
   _delay400ns(port);
-  while (((status = inpb(port+7)) & 0xc0) != 0x40);
+  while (!_is_device_ready(port, &status));
 
-  // Is there an error?!
+  // error?!
   if (status & 1)
     return 1;
 
   _rdblocks(1, buffer);
-      
+
   // If isn't ATA, return with error.
   if (buffer[0] & 0x8000)
     return 1;
@@ -69,6 +73,7 @@ int identify_device(_u8 disk, struct device_id_s *did_ptr)
   return 0;
 }
 
+// return 0 means OK!
 int read_sectors(_u8 disk, _u64 start, _u8 sectors_count, void *buffer, struct device_id_s *did)
 {
   _u16 port;
@@ -124,7 +129,7 @@ int read_sectors(_u8 disk, _u64 start, _u8 sectors_count, void *buffer, struct d
   }
 
   _delay400ns(port);
-  while (((status = inpb(port+7)) & 0xc0) != 0x40);
+  while (!_is_device_ready(port, &status));
 
   if (status & 1)
     return 1;
