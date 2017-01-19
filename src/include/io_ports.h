@@ -112,18 +112,18 @@
 #define PIC1_OCW3              PIC1_OCW1
 #define PIC1_IRR_ISR           PIC1_ICW1
 
-/* Bitmasks */
+/* Bitmaps */
 
-#define PIC_ICW1_BIT           0x10
+#define PIC_ICW1_BIT           0x10         /* Set when writing do PICn_ICW1 port. */
 #define PIC_ICW1_EDGE          0x00
 #define PIC_ICW1_LEVEL         0x08
-#define PIC_ICW1_USE8          0x00
-#define PIC_ICW1_USE4          0x04
 #define PIC_ICW1_NEED_ICW4     0x01
+#define PIC_ICW1_PC            (PIC_ICW1_BIT | PIC_ICW1_EDGE | PIC_ICW1_NEED_ICW4)  /* PCs use this. */
 
 #define PIC_ICW2_VECTOR(v)     (((v) & 0xf) << 4)
 
-#define PIC_ICW3_SLAVE_IRQ(irq) ((irq) & 0xff)
+#define PIC0_ICW3 0x04
+#define PIC1_ICW3 2
 
 /* Implied 8086 mode */
 #define PIC_ICW4_SPECIAL_FULLY_NESTED_MODE  0x11
@@ -134,14 +134,14 @@
 
 #define PIC_OCW1_MASK(irqs)   ((irqs) & 0xff)
 
-#define PIC_OCW2_ROTATE_AUTO_EOI_CLR      0x00
-#define PIC_OCW2_NON_SPECIFIC_EOI         0x20    /* will be used all the time! */
-#define PIC_OCW2_NOP                      0x40
 #define PIC_OCW2_SPECIFIC_EOI             0x60
-#define PIC_OCW2_ROTATE_AUTO_EOI_SET      0x80
+#define PIC_OCW2_NON_SPECIFIC_EOI         0x20    /* will be used all the time! */
 #define PIC_OCW2_ROTATE_NON_SPECIFIC_EOI  0xa0
+#define PIC_OCW2_ROTATE_AUTO_EOI_CLR      0x00
+#define PIC_OCW2_ROTATE_AUTO_EOI_SET      0x80
 #define PIC_OCW2_SET_PRIORITY_CMD         0xc0
 #define PIC_OCW2_ROTATE_SPECIFIC_EOI      0xe0
+#define PIC_OCW2_NOP                      0x40
 #define PIC_OCW2_IRQ(irq)                 ((irq) & 7)
 
 #define PIC_OCW3_RESET_SPECIAL_MASK       0x40
@@ -153,7 +153,7 @@
 /*---------------------------------------
     PIT
   ---------------------------------------*/
-#define PIT_BASE    0x40
+#define PIT_BASE          0x40
 #define PIT_CH0_COUNTER   (PIT_BASE+0)
 #define PIT_SPKR_COUNTER  (PIT_BASE+2)
 #define PIT_MODE          (PIT_BASE+3)
@@ -171,6 +171,7 @@
 #define PIT_MODE_SQRWAV     PIT_MODE_MODE(3)
 #define PIT_MODE_SWSTROBE   PIT_MODE_MODE(4)
 #define PIT_MODE_HWSTROBE   PIT_MODE_MODE(5)
+#define PIT_MODE_BINARY     0x00
 #define PIT_MODE_BCD        0x01
 
 /*---------------------------------------
