@@ -2,6 +2,7 @@
 #define __hw_io_h__
 
 #include <typedefs.h>
+#include <io_ports.h>
 
 inline void outpb(_u16 port, _u8 data) { __asm__ __volatile__( "outb %0,%1" : : "a" (data), "dN" (port)); }
 inline void outpw(_u16 port, _u16 data) { __asm__ __volatile__( "outw %0,%1" : : "a" (data), "dN" (port)); }
@@ -12,7 +13,6 @@ inline _u16 inpw(_u16 port) { _u16 data; __asm__ __volatile__( "inw %1,%0" : "=a
 inline _u32 inpd(_u16 port) { _u32 data; __asm__ __volatile__( "inl %1,%0" : "=a" (data) : "dN" (port)); return data; }
 
 // Stolen from limux! :)
-inline void io_delay(void) { __asm__ __volatile__ ( "outb %%al,$0x80" ); }
 inline void set_es(_u16 seg) { __asm__ __volatile__ ( "movw %0,%%es" : : "rm" (seg) ); }
 inline void set_fs(_u16 seg) { __asm__ __volatile__ ( "movw %0,%%fs" : : "rm" (seg) ); }
 inline void set_gs(_u16 seg) { __asm__ __volatile__ ( "movw %0,%%gs" : : "rm" (seg) ); }
@@ -41,12 +41,20 @@ inline void wr_es32(_u16 addr, _u32 data) { __asm__ __volatile__ ( "movl %0,%%es
 inline void wr_fs32(_u16 addr, _u32 data) { __asm__ __volatile__ ( "movl %0,%%fs:%1" : : "ri" (data), "m" (*(_u32 *)addr) ); }
 inline void wr_gs32(_u16 addr, _u32 data) { __asm__ __volatile__ ( "movl %0,%%gs:%1" : : "ri" (data), "m" (*(_u32 *)addr) ); }
 
+inline void io_delay(void) { __asm__ __volatile__ ("outb %%al,%0" : : "dN" (DMAC0_TEMP)); }
+
 inline void disable_ints(void) { __asm__ __volatile__ ("cli"); }
 inline void enable_ints(void) { __asm__ __volatile__ ("sti"); }
 
-inline void disable_nmi(void) { outpb(0x70, inpb(0x70) | 0x80); }
-inline void enable_nmi(void) { outpb(0x70, inpb(0x70) & 0x7f); }
+inline void disable_nmi(void) { outpb(CMOS_RTC_INDEX, inpb(CMOS_RTC_INDEX) | CMOS_RTC_IDX_NMI_DISABLE); }
+inline void enable_nmi(void) { outpb(CMOS_RTC_INDEX, inpb(CMOS_RTC_INDEX) & ~CMOS_RTC_IDX_NMI_DISABLE); }
 
 inline void halt(void) { do { __asm__ __volatile__ ("hlt"); } while (1); }
+
+inline void mask_all_irqs(void) { outpb(PIC0_OCW1, PIC_OCW1_MASK(0xfb)); // irq2 should not be masked.
+                                  outpb(PIC1_OCW1, PIC_OCW1_MASK(0xff)); }
+
+extern void mask_irq(int);
+extern void unmask_irq(int);
 
 #endif
