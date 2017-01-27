@@ -14,6 +14,8 @@ section .text
 extern _main32
 
 _start:
+  ; FIXME: What parameters will be passed to kernel from stage1?
+
   ; Stack will be at the end of bss plus 4 pages (4 pages stack size).
   mov   esp,_end_end + STK_TOP - 4
   call  setup_new_gdt

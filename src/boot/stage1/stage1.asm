@@ -119,7 +119,7 @@ _main:
   push  dword [boot_blocks]
   ; FIXME: Possibly I could add 8 sectors here beforehand.
   ;        The kernel is just after this code's block.
-  push  dword [boot_start_addr+4]
+  push  dword [boot_start_addr+4]   ; highest dword first.
   push  dword [boot_start_addr]
   movzx eax,byte [drivenum]
   push  eax

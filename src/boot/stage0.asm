@@ -18,11 +18,11 @@ org 0
 
 ;--------
 ;--------
-signature:      db  'MyToyOS',0 ; 8 bytes!
-drivenum:       db  0x80  ; Set by disk formating...
-boot_start_sector:  dq  0 ; Boot partition LBA48 address. (same here!).
-                          ;   4 KiB Stage1 Boot block and kernel blocks are here!
-boot_blocks:        dd  0 ; Will be set below.
+signature:          db  'MyToyOS',0 ; 8 bytes!
+drivenum:           db  0x80        ; Set by disk formating...
+boot_start_sector:  dq  0           ; Boot partition LBA48 address. (same here!).
+                                    ;   4 KiB Stage1 Boot block and kernel blocks are here!
+boot_blocks:        dd  0           ; Will be set below.
 
 _start:
   cld
