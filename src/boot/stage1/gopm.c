@@ -18,7 +18,7 @@ int setup_pm(void)
 {
   if (!enable_a20())
   {
-    real_puts("[!] ERROR enabling gate A20!");
+    r_puts("[!] ERROR enabling gate A20!");
     return 1;
   }
 

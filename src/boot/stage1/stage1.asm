@@ -34,7 +34,7 @@ bits 16
 
 global _start
 ; Enters here with EBX:EAX = boot_start_lba48
-;                  ECX = number of boot blocks.
+;                  ECX = number of boot blocks to read.
 ;                  DL = drivenum.
 _start:
   mov   ax,cs
@@ -43,9 +43,13 @@ _start:
   mov   esp,0xfffc    ; To be sure we are at stack top.
                       ; SS still points to 0x9000.
 
+  ; Save entry data.
+  mov   [boot_start_addr],eax
+  mov   [boot_start_addr+4],ebx
+  mov   [boot_blocks],ecx
+  mov   [drivenum],dl
+
   ; Clears bss section
-  push  eax
-  push  ecx
   mov   edi,_bss_start
   mov   ecx,_bss_end
   sub   ecx,edi       ; ECX is the size, in bytes.
@@ -56,8 +60,6 @@ _start:
 .nothing_to_clear:
   call  setup_pm
   test  eax,eax
-  pop   ecx
-  pop   eax
   jz    .continue
 
 .halt:
@@ -65,36 +67,41 @@ _start:
   jmp   .halt
 
 .continue:
-  ; Save entry info.
-  mov   [drivenum],dl
-  mov   [boot_start_addr],eax
-  mov   [boot_start_addr+4],ebx
-  mov   [boot_blocks],ecx
-
   ; TODO...
 
   cli                 ; No interrupts!
-
   call  mask_all_irqs
   call  mask_nmi
 
   ; Setup empty idt.
   lidt  [empty_idt]
 
-  ; Setup task state segment (recomended by Intel).
+  ; TODO: Setup task state segment (recomended by Intel).
 
   ; Setup gdt and jumps to protected mode.
   lgdt  [gdt_desc]
   mov   eax,cr0
-  or    eax,1
+  or    eax,1         ; Set Protecting Enabled bit.
   mov   cr0,eax
-  jmp   8:_main       ; Jumps to protected mode.
+  jmp   8:_main       ; Jumps to protected mode code below.
+
+; Ok... this is replicated here, but now is a 32 bit C function.
+;
+; void r_puts(char *);
+;
+; Will be used by 16 bit C code.
+struc r_puts_stk
+.oldebp:  resd  1
+.retaddr: resw  1
+.ptr:     resd  1
+endstruc
 
 global  r_puts
-; void r_puts(char *);
 r_puts:
+  push  ebp
+  mov   ebp,esp
   cld
-  mov   si,[esp+4]
+  mov   esi,[ebp+r_puts_stk.ptr]
 .loop:
   lodsb
   test  al,al
@@ -103,8 +110,12 @@ r_puts:
   int   0x10
   jmp   .loop
 .exit:
+  pop   ebp
   ret
 
+;==========================================
+; 32 Bit protected mode code.
+;==========================================
 bits 32
 
   align 4
@@ -112,7 +123,7 @@ _main:
   mov   ax,0x10       ; Default data segment.
   mov   ds,ax
   mov   es,ax
-  mov   ss,ax
+  mov   ss,ax         ; We don't need a special stack segment, yet!
   mov   esp,0x9fffc   ; set ESP back to lower RAM top.
 
   ; ret = loadkernel(drivenum, boot_start_addr, boot_blocks);
@@ -124,12 +135,12 @@ _main:
   movzx eax,byte [drivenum]
   push  eax
   call  load_kernel
-
   test  eax,eax       ; if returns 0, kernel is loaded.
   jnz   .load_error
 
-  ; FIXME: What should I pass to the kernel here?
+  ; TODO: What should I pass to the kernel here?
   jmp   8:0x100000    ; jumps to kernel.
+
 .load_error:
   jmp   load_kernel_error
 
@@ -137,11 +148,13 @@ _main:
 ; Smaller routine used by protected mode C code.
 ;-------------------
 struc calc_csum16_stk
+.retaddr:   resd  1
 .bufferptr: resd  1
 .size:      resd  1
 endstruc
 
 global  calc_chksum16
+; _u16 calc_checksum16(void *bufferptr, _u32 size);
 calc_chksum16:
   mov   ecx,[esp+calc_csum16_stk.size]
   mov   esi,[esp+calc_csum16_stk.bufferptr]
