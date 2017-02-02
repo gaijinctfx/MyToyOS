@@ -17,7 +17,6 @@ void clear_screen(void)
   _u16 b = ' ' | ((_u16)current_attrib << 8);
 
   __asm__ __volatile__ (
-    "cld\n"
     "rep; stosw" :
     : "a" (b), "S" (0xb8000), "c" (4000)
   );
@@ -36,7 +35,6 @@ void scroll_up(void)
     "movl %%edi,%%esi\n"
     "add  $160,%%esi\n"
     "movl $1920,%%ecx\n"    // 1920 words.
-    "cld\n"
     "rep; movsw\n"
 
     // clear last line.

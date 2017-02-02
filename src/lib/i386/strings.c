@@ -1,14 +1,25 @@
+#include <typedefs.h>
+
 char *strcpy(char *dest, char *src)
 {
+  char *p = dest;
+
   while (*dest++ = *src++);
+
+  return p;
 }
 
 _u32 strlen(char *src)
 {
-  _u32 size = 0;
+  _u32 size = (_u32)-1;
 
-  while (*src++) 
-    size++;
+  __asm__ __volatile__ (
+    "xorb %%al,%%al\n"
+    "repnz; scasb"
+    : "=c" (size)
+    : "D" (src)
+    : "eax"
+  );
 
-  return size;
+  return ~size - 1;
 }
